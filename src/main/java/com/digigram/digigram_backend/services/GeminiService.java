@@ -10,8 +10,9 @@ import java.util.*;
 @Service
 public class GeminiService {
 
-    @Value("${GEMINI_API_KEY}")
-    private String apiKey;
+	@Value("${GEMINI_API_KEY:}")
+	private String apiKey;
+    
 
     private final RestTemplate restTemplate = new RestTemplate();
 
