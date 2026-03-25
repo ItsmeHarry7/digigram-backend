@@ -6,9 +6,7 @@ import com.google.firebase.FirebaseOptions;
 import org.springframework.context.annotation.Configuration;
 
 import jakarta.annotation.PostConstruct;
-import org.springframework.core.io.ClassPathResource;
-
-import java.io.InputStream;
+import java.io.ByteArrayInputStream;
 
 @Configuration
 public class FirebaseConfig {
@@ -16,9 +14,15 @@ public class FirebaseConfig {
     @PostConstruct
     public void init() {
         try {
-            // service account file must be in: src/main/resources/firebase-service-account.json
-            InputStream serviceAccount =
-                    new ClassPathResource("firebase-service-account.json").getInputStream();
+
+            String firebaseConfig = System.getenv("FIREBASE_CONFIG_JSON");
+
+            if (firebaseConfig == null || firebaseConfig.isEmpty()) {
+                throw new RuntimeException("❌ FIREBASE_CONFIG_JSON not set in environment");
+            }
+
+            ByteArrayInputStream serviceAccount =
+                    new ByteArrayInputStream(firebaseConfig.getBytes());
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -27,8 +31,6 @@ public class FirebaseConfig {
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
                 System.out.println("🔥 Firebase initialized successfully");
-            } else {
-                System.out.println("Firebase already initialized");
             }
 
         } catch (Exception e) {
