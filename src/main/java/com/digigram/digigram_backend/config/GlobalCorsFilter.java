@@ -21,16 +21,12 @@ public class GlobalCorsFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        String origin = request.getHeader("Origin");
+      
 
         // Allow both local + production dynamically
-        if (origin != null &&
-                (origin.contains("localhost") ||
-                 origin.contains("digigram-d0eb7.web.app"))) {
+        String origin = request.getHeader("Origin");
 
-            response.setHeader("Access-Control-Allow-Origin", origin);
-        }
-
+        response.setHeader("Access-Control-Allow-Origin", origin);
         response.setHeader("Vary", "Origin");
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "*");
