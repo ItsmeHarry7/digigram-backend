@@ -6,7 +6,11 @@ import com.google.firebase.FirebaseOptions;
 import org.springframework.context.annotation.Configuration;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.core.io.ClassPathResource;
+
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 public class FirebaseConfig {
@@ -15,14 +19,21 @@ public class FirebaseConfig {
     public void init() {
         try {
 
+            InputStream serviceAccount;
+
             String firebaseConfig = System.getenv("FIREBASE_CONFIG_JSON");
 
-            if (firebaseConfig == null || firebaseConfig.isEmpty()) {
-                throw new RuntimeException("❌ FIREBASE_CONFIG_JSON not set in environment");
+            if (firebaseConfig != null && !firebaseConfig.isEmpty()) {
+                // ✅ PRODUCTION (Render)
+                serviceAccount = new ByteArrayInputStream(
+                        firebaseConfig.getBytes(StandardCharsets.UTF_8)
+                );
+                System.out.println("🔥 Using ENV Firebase config");
+            } else {
+                // ✅ LOCAL FALLBACK
+                serviceAccount = new ClassPathResource("firebase-service-account.json").getInputStream();
+                System.out.println("🔥 Using LOCAL Firebase file");
             }
-
-            ByteArrayInputStream serviceAccount =
-                    new ByteArrayInputStream(firebaseConfig.getBytes());
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -30,7 +41,7 @@ public class FirebaseConfig {
 
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
-                System.out.println("🔥 Firebase initialized successfully");
+                System.out.println("✅ Firebase initialized SUCCESS");
             }
 
         } catch (Exception e) {
