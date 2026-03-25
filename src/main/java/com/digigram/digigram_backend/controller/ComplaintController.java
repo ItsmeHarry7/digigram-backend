@@ -1,5 +1,6 @@
 package com.digigram.digigram_backend.controller;
 
+import com.digigram.digigram_backend.dto.ComplaintDTO;
 import com.digigram.digigram_backend.model.Complaint;
 import com.digigram.digigram_backend.services.ComplaintService;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +20,7 @@ public class ComplaintController {
     // ================= CREATE =================
     @PostMapping
     public ResponseEntity<?> createComplaint(
-            @RequestBody Complaint complaint,
+            @RequestBody ComplaintDTO dto,
             jakarta.servlet.http.HttpServletRequest request) {
 
         String uid = (String) request.getAttribute("uid");
@@ -28,13 +29,39 @@ public class ComplaintController {
             return ResponseEntity.status(401).body("Unauthorized");
         }
 
+        Complaint complaint = new Complaint();
+
+        // USER
         complaint.setCitizenId(uid);
+        complaint.setCitizenName("Citizen");
+        complaint.setCitizenPhone("Not Provided");
+
+        // BASIC
+        complaint.setTitle(dto.title);
+        complaint.setDescription(dto.description);
+
+        // LOCATION (FIXED)
+        if (dto.lat == null || dto.lng == null) {
+            return ResponseEntity.badRequest().body("Location required");
+        }
+
+        complaint.setLatitude(dto.lat);
+        complaint.setLongitude(dto.lng);
+
+        // IMAGE (FIXED ✅)
+        if (dto.images != null && !dto.images.isEmpty()) {
+            complaint.setImageUrl(dto.images); // ✔ FULL LIST
+        }
+
+        // DEFAULT
+        complaint.setStatus("Pending");
+        complaint.setPriority("Medium");
+        complaint.setTimestamp(System.currentTimeMillis());
 
         Complaint saved = complaintService.createComplaint(complaint);
 
         return ResponseEntity.ok(saved);
     }
-
     // ================= GET MY COMPLAINTS =================
     @GetMapping("/my")
     public ResponseEntity<?> getMyComplaints(
