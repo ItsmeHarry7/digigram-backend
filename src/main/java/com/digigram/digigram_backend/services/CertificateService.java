@@ -120,4 +120,16 @@ public class CertificateService {
 
         return result;
     }
+
+	public void rejectWithReason(String id, String reason) throws Exception {
+
+    Firestore db = FirestoreClient.getFirestore();
+
+    db.collection("certificates")
+        .document(id)
+        .update(
+            "status", "Rejected",
+            "adminReason", reason
+        );
+}
 }

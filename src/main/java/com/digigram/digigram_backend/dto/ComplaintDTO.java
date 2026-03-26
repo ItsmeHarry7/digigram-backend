@@ -42,8 +42,13 @@ public class ComplaintDTO {
 
     public List<String> images;
 
+    public String citizenName;
+    public String citizenPhone;
+    
     public String documentUrl;
 
     public String incidentDate;
     public Map<String, Object> address;
+
+    public String audioUrl;
 }

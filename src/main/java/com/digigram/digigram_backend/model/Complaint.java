@@ -22,7 +22,8 @@ public class Complaint {
     // Media
     private List<String> imageUrl;
     private String documentUrl;
-
+    private String audioUrl;
+    private String transcript;
     // ================= WORKFLOW =================
     private String status;            // Pending, In Progress, Resolved, Rejected
     private long timestamp;           // Creation time (System.currentTimeMillis)
@@ -103,4 +104,17 @@ public class Complaint {
     public void setLongitude(double longitude) {
         this.longitude = longitude;
     }
+	public String getAudioUrl() {
+		return audioUrl;
+	}
+	public void setAudioUrl(String audioUrl) {
+		this.audioUrl = audioUrl;
+	}
+	public String getTranscript() {
+		return transcript;
+	}
+	public void setTranscript(String transcript) {
+		this.transcript = transcript;
+	}
+	
 }

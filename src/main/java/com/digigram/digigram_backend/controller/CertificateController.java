@@ -1,6 +1,7 @@
 package com.digigram.digigram_backend.controller;
 
 import com.digigram.digigram_backend.services.CertificateService;
+import com.digigram.digigram_backend.services.CitizenService;
 import com.digigram.digigram_backend.dto.CertificateRequestDTO;
 
 import org.springframework.web.bind.annotation.*;
@@ -9,17 +10,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.*;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseToken;
+
 @RestController
 @RequestMapping("/api/certificates")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "*") // ✅ FIX FOR HOSTING
 public class CertificateController {
 
     @Autowired
     private CertificateService service;
 
-    // CREATE
+    @Autowired
+    private CitizenService citizenService; // 🔥 ADD THIS
+
+    // ================= CREATE =================
     @PostMapping
     public Map<String, String> create(
             @RequestBody CertificateRequestDTO dto,
@@ -31,25 +34,38 @@ public class CertificateController {
             throw new RuntimeException("Unauthorized");
         }
 
-        String authHeader = request.getHeader("Authorization");
-        String token = authHeader.substring(7);
+        // 🔥 FETCH PROFILE
+        Map<String, Object> profile = citizenService.getProfile(uid);
 
-        FirebaseToken decodedToken =
-                FirebaseAuth.getInstance().verifyIdToken(token);
+        String name = "Unknown";
+        String phone = "Not Provided";
+        String aadhaar = "-";
+
+        if (profile != null) {
+            name = (String) profile.getOrDefault("name", "Unknown");
+            phone = (String) profile.getOrDefault("phone", "Not Provided");
+            aadhaar = (String) profile.getOrDefault("aadhaar", "-");
+        }
 
         Map<String, Object> data = new HashMap<>();
+
         data.put("uid", uid);
-        data.put("name", decodedToken.getName());   // ✅ Only name
-        data.put("phone", dto.getPhone());
+        data.put("name", name);
+        data.put("phone", phone);
+        data.put("aadhaar", aadhaar);
+
         data.put("type", dto.getType());
         data.put("reason", dto.getReason());
+
+        data.put("status", "Pending");
+        data.put("adminReason", "");
 
         String id = service.createCertificate(data);
 
         return Map.of("id", id);
     }
 
-    // GET MY CERTIFICATES
+    // ================= GET MY =================
     @GetMapping("/my")
     public List<Map<String, Object>> getMyCertificates(
             HttpServletRequest request) throws Exception {
@@ -58,37 +74,26 @@ public class CertificateController {
         return service.getByUser(uid);
     }
 
-    // ADMIN: GET ALL
+    // ================= ADMIN =================
     @GetMapping("/all")
-    public List<Map<String, Object>> getAllCertificates()
-            throws Exception {
-
+    public List<Map<String, Object>> getAllCertificates() throws Exception {
         return service.getAll();
     }
 
-    // APPROVE
+    // ================= APPROVE =================
     @PutMapping("/{id}/approve")
     public String approve(@PathVariable String id) throws Exception {
         service.approve(id);
         return "Approved";
     }
 
-    // REJECT
+    // ================= REJECT WITH REASON =================
     @PutMapping("/{id}/reject")
-    public String reject(@PathVariable String id) throws Exception {
-        service.reject(id);
+    public String reject(
+            @PathVariable String id,
+            @RequestParam String reason) throws Exception {
+
+        service.rejectWithReason(id, reason);
         return "Rejected";
-    }
-
-    // VERIFY
-    @GetMapping("/verify/{code}")
-    public Object verify(@PathVariable String code) throws Exception {
-
-        Map<String, Object> result = service.verify(code);
-
-        if (result == null)
-            return Map.of("status", "Invalid");
-
-        return result;
     }
 }
