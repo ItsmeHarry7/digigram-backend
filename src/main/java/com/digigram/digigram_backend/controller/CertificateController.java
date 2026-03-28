@@ -4,8 +4,10 @@ import com.digigram.digigram_backend.services.CertificateService;
 import com.digigram.digigram_backend.services.CitizenService;
 import com.digigram.digigram_backend.dto.CertificateRequestDTO;
 
+
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -79,7 +81,18 @@ public class CertificateController {
     public List<Map<String, Object>> getAllCertificates() throws Exception {
         return service.getAll();
     }
+    
+    @GetMapping("/verify/{code}")
+    public ResponseEntity<?> verifyCertificate(@PathVariable String code) throws Exception {
 
+        Map<String, Object> cert = service.verify(code); // 🔥 USE SERVICE
+
+        if (cert == null) {
+            return ResponseEntity.status(404).body("Invalid Certificate ❌");
+        }
+
+        return ResponseEntity.ok(cert);
+    }
     // ================= APPROVE =================
     @PutMapping("/{id}/approve")
     public String approve(@PathVariable String id) throws Exception {

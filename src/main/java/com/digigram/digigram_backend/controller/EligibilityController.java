@@ -7,6 +7,8 @@ import com.google.firebase.cloud.FirestoreClient;
 
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,117 +20,124 @@ public class EligibilityController {
     @PostMapping("/check")
     public Map<String, Object> checkEligibility(@RequestBody EligibilityRequest req) throws Exception {
 
-        Map<String, Object> response = new HashMap<>();
+        Map<String, Object> res = new HashMap<>();
 
         if (req.getUid() == null || req.getSchemeId() == null) {
-            response.put("eligible", false);
-            response.put("message", "Invalid request data.");
-            return response;
+            res.put("eligible", false);
+            res.put("message", "Invalid request");
+            return res;
         }
 
         Firestore db = FirestoreClient.getFirestore();
 
-        DocumentSnapshot citizenDoc = db.collection("citizenProfiles")
-                .document(req.getUid())
-                .get()
-                .get();
+        DocumentSnapshot citizen = db.collection("citizenProfiles")
+                .document(req.getUid()).get().get();
 
-        if (!citizenDoc.exists()) {
-            response.put("eligible", false);
-            response.put("message", "Citizen profile not found.");
-            return response;
+        DocumentSnapshot scheme = db.collection("schemes")
+                .document(req.getSchemeId()).get().get();
+
+        if (!citizen.exists() || !scheme.exists()) {
+            res.put("eligible", false);
+            res.put("message", "Data not found");
+            return res;
         }
 
-        DocumentSnapshot schemeDoc = db.collection("schemes")
-                .document(req.getSchemeId())
-                .get()
-                .get();
+        /* ================= SAFE PARSING ================= */
+        String dob = citizen.getString("dateOfBirth");
+        Integer age = null;
 
-        if (!schemeDoc.exists()) {
-            response.put("eligible", false);
-            response.put("message", "Scheme not found.");
-            return response;
+        try {
+            if (dob != null) {
+                LocalDate d = LocalDate.parse(dob);
+                age = Period.between(d, LocalDate.now()).getYears();
+            }
+        } catch (Exception e) {
+            age = null;
         }
 
-        Integer age = parseInteger(citizenDoc.get("age"));
-        Double income = parseDouble(citizenDoc.get("income"));
-        String religion = citizenDoc.getString("religion");
-        String caste = citizenDoc.getString("caste");
+        Double income = parseDouble(citizen.get("income"));
 
-        Integer minAge = parseInteger(schemeDoc.get("minAge"));
-        Integer maxAge = parseInteger(schemeDoc.get("maxAge"));
-        Double minIncome = parseDouble(schemeDoc.get("minIncome"));
-        Double maxIncome = parseDouble(schemeDoc.get("maxIncome"));
-        String allowedReligion = schemeDoc.getString("allowedReligion");
-        String allowedCaste = schemeDoc.getString("allowedCaste");
+        String gender = safe(citizen.getString("gender"));
+        String religion = safe(citizen.getString("religion"));
+        String caste = safe(citizen.getString("caste"));
+        String occupation = safe(citizen.getString("occupation"));
+        Boolean disability = citizen.getBoolean("hasDisability");
 
-        boolean eligible = true;
-        String reason = "";
+        Integer minAge = parseInt(scheme.get("minAge"));
+        Integer maxAge = parseInt(scheme.get("maxAge"));
+        Double minIncome = parseDouble(scheme.get("minIncome"));
+        Double maxIncome = parseDouble(scheme.get("maxIncome"));
+
+        String allowedGender = safe(scheme.getString("allowedGender"));
+        String allowedReligion = safe(scheme.getString("allowedReligion"));
+        String allowedCaste = safe(scheme.getString("allowedCaste"));
+        String allowedOccupation = safe(scheme.getString("allowedOccupation"));
+        Boolean disabilityOnly = scheme.getBoolean("disabilityOnly");
+
+        /* ================= VALIDATION ================= */
 
         if (age == null || income == null) {
-            eligible = false;
-            reason = "Profile incomplete (Age or Income missing)";
+            return fail("Profile incomplete (age/income missing)");
         }
 
-        if (eligible && minAge != null && age < minAge) {
-            eligible = false;
-            reason = "Minimum age criteria not satisfied";
+        if (minAge != null && age < minAge) return fail("Minimum age not satisfied");
+        if (maxAge != null && age > maxAge) return fail("Maximum age exceeded");
+
+        if (minIncome != null && income < minIncome) return fail("Income too low");
+        if (maxIncome != null && income > maxIncome) return fail("Income too high");
+
+        if (!allowedGender.isEmpty()
+                && !allowedGender.equalsIgnoreCase("All")
+                && !allowedGender.equalsIgnoreCase(gender)) {
+            return fail("Gender criteria not satisfied");
         }
 
-        if (eligible && maxAge != null && age > maxAge) {
-            eligible = false;
-            reason = "Maximum age exceeded";
-        }
-
-        if (eligible && minIncome != null && income < minIncome) {
-            eligible = false;
-            reason = "Income below required limit";
-        }
-
-        if (eligible && maxIncome != null && income > maxIncome) {
-            eligible = false;
-            reason = "Income exceeds allowed limit";
-        }
-
-        if (eligible && allowedReligion != null && !allowedReligion.isEmpty()
-                && religion != null
+        if (!allowedReligion.isEmpty()
                 && !allowedReligion.equalsIgnoreCase(religion)) {
-            eligible = false;
-            reason = "Religion criteria not satisfied";
+            return fail("Religion criteria not satisfied");
         }
 
-        if (eligible && allowedCaste != null && !allowedCaste.isEmpty()
-                && caste != null
+        if (!allowedCaste.isEmpty()
                 && !allowedCaste.equalsIgnoreCase(caste)) {
-            eligible = false;
-            reason = "Caste criteria not satisfied";
+            return fail("Caste criteria not satisfied");
         }
 
-        response.put("eligible", eligible);
-        response.put("message", eligible ? "You are eligible!" : reason);
+        if (disabilityOnly != null && disabilityOnly
+                && (disability == null || !disability)) {
+            return fail("Only for disabled");
+        }
 
-        return response;
+        if (!allowedOccupation.isEmpty()
+                && !allowedOccupation.equalsIgnoreCase(occupation)) {
+            return fail("Occupation not eligible");
+        }
+
+        res.put("eligible", true);
+        res.put("message", "Eligible");
+
+        return res;
     }
 
-    private Integer parseInteger(Object value) {
-        if (value == null) return null;
-        if (value instanceof Number) return ((Number) value).intValue();
+    /* ================= HELPERS ================= */
 
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (Exception e) {
-            return null;
-        }
+    private String safe(String s) {
+        return s == null ? "" : s.trim();
     }
 
-    private Double parseDouble(Object value) {
-        if (value == null) return null;
-        if (value instanceof Number) return ((Number) value).doubleValue();
+    private Map<String, Object> fail(String msg) {
+        Map<String, Object> r = new HashMap<>();
+        r.put("eligible", false);
+        r.put("message", msg);
+        return r;
+    }
 
-        try {
-            return Double.parseDouble(value.toString());
-        } catch (Exception e) {
-            return null;
-        }
+    private Integer parseInt(Object o) {
+        try { return o == null ? null : Integer.parseInt(o.toString()); }
+        catch(Exception e){ return null; }
+    }
+
+    private Double parseDouble(Object o) {
+        try { return o == null ? null : Double.parseDouble(o.toString()); }
+        catch(Exception e){ return null; }
     }
 }

@@ -129,9 +129,12 @@ public class AiPriorityService {
         try {
             // Prepare payload for ML
             Map<String, Object> payload = new HashMap<>();
-            payload.put("title", complaint.getTitle());
-            payload.put("description", complaint.getDescription());
-            payload.put("category", complaint.getCategory());
+            payload.put("title", complaint.getTitle() != null ? complaint.getTitle() : "");
+            payload.put("description", complaint.getDescription() != null ? complaint.getDescription() : "");
+            
+            // ✅ Handle null category - send empty string if null
+            String category = complaint.getCategory();
+            payload.put("category", category != null ? category : "");
 
             // Call Python API
             Map<String, Object> response =
@@ -156,5 +159,4 @@ public class AiPriorityService {
             complaint.setAiScore(50);
         }
     }
-}
-
+    }
