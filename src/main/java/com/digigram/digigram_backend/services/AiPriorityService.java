@@ -100,12 +100,74 @@
 ////Creates SLA deadlines	✅
 ////Supports analytics dashboard	✅ 
 ///
+//package com.digigram.digigram_backend.services;
+//
+//import com.digigram.digigram_backend.model.Complaint;
+//import org.springframework.beans.factory.annotation.Value;
+//import org.springframework.stereotype.Service;
+//import org.springframework.web.client.RestTemplate;
+//
+//import java.util.HashMap;
+//import java.util.Map;
+//
+//@Service
+//public class AiPriorityService {
+//
+//    private final RestTemplate restTemplate;
+//
+//    // URL of the Python Flask service
+//    @Value("${ai.priority.url:http://localhost:5001/predict_priority}")
+//    private String aiUrl;
+//
+//    public AiPriorityService(RestTemplate restTemplate) {
+//        this.restTemplate = restTemplate;
+//    }
+//
+//    @SuppressWarnings("unchecked")
+//    public void enrichWithAiPriority(Complaint complaint) {
+//
+//        try {
+//            // Prepare payload for ML
+//            Map<String, Object> payload = new HashMap<>();
+//            payload.put("title", complaint.getTitle() != null ? complaint.getTitle() : "");
+//            payload.put("description", complaint.getDescription() != null ? complaint.getDescription() : "");
+//            
+//            // ✅ Handle null category - send empty string if null
+//            String category = complaint.getCategory();
+//            payload.put("category", category != null ? category : "");
+//
+//            // Call Python API
+//            Map<String, Object> response =
+//                    restTemplate.postForObject(aiUrl, payload, Map.class);
+//
+//            if (response != null) {
+//                String priority = (String) response.getOrDefault("priority", "Medium");
+//                Number score = (Number) response.getOrDefault("aiScore", 50);
+//
+//                complaint.setPriority(priority);
+//                complaint.setAiScore(score.intValue());
+//            } else {
+//                // fallback
+//                complaint.setPriority("Medium");
+//                complaint.setAiScore(50);
+//            }
+//
+//        } catch (Exception e) {
+//            // If AI service down → don't break app, use fallback
+//            e.printStackTrace();
+//            complaint.setPriority("Medium");
+//            complaint.setAiScore(50);
+//        }
+//    }
+//    }
+
 package com.digigram.digigram_backend.services;
 
 import com.digigram.digigram_backend.model.Complaint;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -113,50 +175,55 @@ import java.util.Map;
 @Service
 public class AiPriorityService {
 
-    private final RestTemplate restTemplate;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    // URL of the Python Flask service
-    @Value("${ai.priority.url:http://localhost:5001/predict_priority}")
-    private String aiUrl;
+    // ✅ SAME BASE URL (IMPORTANT)
+    @Value("${ai.service.url}")
+    private String baseUrl;
 
-    public AiPriorityService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
-
-    @SuppressWarnings("unchecked")
     public void enrichWithAiPriority(Complaint complaint) {
 
+        String url = baseUrl + "/predict_priority";
+
         try {
-            // Prepare payload for ML
             Map<String, Object> payload = new HashMap<>();
             payload.put("title", complaint.getTitle() != null ? complaint.getTitle() : "");
             payload.put("description", complaint.getDescription() != null ? complaint.getDescription() : "");
-            
-            // ✅ Handle null category - send empty string if null
-            String category = complaint.getCategory();
-            payload.put("category", category != null ? category : "");
+            payload.put("category", complaint.getCategory() != null ? complaint.getCategory() : "");
 
-            // Call Python API
-            Map<String, Object> response =
-                    restTemplate.postForObject(aiUrl, payload, Map.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-            if (response != null) {
-                String priority = (String) response.getOrDefault("priority", "Medium");
-                Number score = (Number) response.getOrDefault("aiScore", 50);
+            HttpEntity<Map<String, Object>> request =
+                    new HttpEntity<>(payload, headers);
+
+            ResponseEntity<Map> response =
+                    restTemplate.postForEntity(url, request, Map.class);
+
+            Map<?, ?> res = response.getBody();
+
+            if (res != null) {
+
+                Object priorityObj = res.get("priority");
+                String priority = (priorityObj != null) ? priorityObj.toString() : "Medium";
+
+                Object scoreObj = res.get("aiScore");
+                int score = (scoreObj instanceof Number)
+                        ? ((Number) scoreObj).intValue()
+                        : 50;
 
                 complaint.setPriority(priority);
-                complaint.setAiScore(score.intValue());
+                complaint.setAiScore(score);
+
             } else {
-                // fallback
                 complaint.setPriority("Medium");
                 complaint.setAiScore(50);
             }
 
         } catch (Exception e) {
-            // If AI service down → don't break app, use fallback
             e.printStackTrace();
             complaint.setPriority("Medium");
             complaint.setAiScore(50);
         }
     }
-    }
+}
