@@ -206,6 +206,9 @@ public class AiPriorityService {
 
                 Object priorityObj = res.get("priority");
                 String priority = (priorityObj != null) ? priorityObj.toString() : "Medium";
+                
+                Object categoryObj = res.get("category");
+                String category = (categoryObj != null) ? categoryObj.toString() : "General";
 
                 Object scoreObj = res.get("aiScore");
                 int score = (scoreObj instanceof Number)
@@ -214,6 +217,7 @@ public class AiPriorityService {
 
                 complaint.setPriority(priority);
                 complaint.setAiScore(score);
+                complaint.setCategory(category);
 
             } else {
                 complaint.setPriority("Medium");
