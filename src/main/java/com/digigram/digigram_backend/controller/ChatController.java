@@ -19,7 +19,7 @@ public class ChatController {
     @PostMapping
     public Map<String, String> chat(@RequestBody Map<String, String> body) {
 
-        String message = body.get("message");
+        String message = body.getOrDefault("message", "");
 
         String reply = geminiService.chat(message);
 
